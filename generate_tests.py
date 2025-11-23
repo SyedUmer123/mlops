@@ -42,10 +42,14 @@ def generate_test_code(app_code):
     Write a complete Python test file using `pytest` and `fastapi.testclient`.
     
     CRITICAL INSTRUCTIONS:
-    1. **State Isolation:** The `todos` dictionary in `app.py` is a global variable. You MUST create a `pytest.fixture(autouse=True)` that imports `todos` from `app` and clears it (`todos.clear()`) before every single test.
-    2. **Validation Rules:** The `TodoCreate` model currently ALLOWS empty strings. Do NOT write a test expecting a 422 error for empty titles. Expect a 200 OK.
-    3. **Imports:** Ensure you import `app` and `todos` correctly: `from app import app, todos`.
-    4. **Output:** Provide ONLY the executable python code. No markdown, no explanations.
+    1. **State Isolation:** The `todos` dictionary in `app.py` is global. Create a `pytest.fixture(autouse=True)` that clears it (`todos.clear()`) before every test.
+    2. **NO HARDCODED IDs:** The `next_id` counter in the app does NOT reset. 
+       - When testing updates or deletions, you MUST create a new todo first.
+       - **Capture the ID** from the creation response (e.g., `todo_id = response.json()["id"]`).
+       - Use that captured variable `todo_id` for your DELETE/GET requests.
+       - NEVER assume the ID is 1.
+    3. **Edge Cases:** Handle creating a todo with an empty title (expect 200 OK).
+    4. **Output:** Provide ONLY the executable python code. No markdown.
     """
 
     response = client.chat.completions.create(
