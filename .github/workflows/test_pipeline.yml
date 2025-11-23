@@ -31,7 +31,7 @@ jobs:
 
       - name: Run tests
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }} 
+          API_KEY: ${{ secrets.API_KEY }} 
         run: |
           python generate_tests.py
 
