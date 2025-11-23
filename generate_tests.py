@@ -25,18 +25,23 @@ def read_code(file_path):
 
 def generate_test_code(app_code):
     print("🤖 AI is generating tests...")
+    
+    # --- UPDATED PROMPT WITH STRICT IMPORT RULES ---
     prompt = f"""
     You are a Senior QA Automation Engineer.
-    Here is a FastAPI application code:
+    Here is a FastAPI application code (filename: app.py):
     ```python
     {app_code}
     ```
     Write a complete Python test file using `pytest` and `fastapi.testclient`.
     
     CRITICAL INSTRUCTIONS:
-    1. **State Isolation:** Create a `pytest.fixture(autouse=True)` that clears `todos` dictionary before every test.
-    2. **Dynamic IDs:** Capture IDs from responses. Do NOT assume ID is 1.
-    3. **Output:** Provide ONLY the executable python code.
+    1. **Import Rule:** You MUST use exactly this import statement: 
+       `from app import app, todos`
+       (Do NOT use 'from v1.app' or 'from src.app').
+    2. **State Isolation:** Create a `pytest.fixture(autouse=True)` that clears the `todos` dictionary before every test.
+    3. **Dynamic IDs:** Capture IDs from responses. Do NOT assume ID is 1.
+    4. **Output:** Provide ONLY the executable python code. No markdown.
     """
 
     response = client.chat.completions.create(
