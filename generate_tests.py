@@ -15,7 +15,7 @@ if not API_KEY:
 else:
     client = OpenAI(api_key=API_KEY, base_url="https://api.groq.com/openai/v1")
 
-MODEL_NAME = "llama3-70b-8192"
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 # ================= LOGIC =================
 
