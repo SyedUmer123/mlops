@@ -5,7 +5,7 @@ import mlflow
 from openai import OpenAI
 
 # ================= CONFIGURATION =================
-API_KEY = os.getenv("GROQ_API_KEY")
+API_KEY = os.getenv("API_KEY")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 
 # Setup Client
