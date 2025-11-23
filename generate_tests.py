@@ -6,8 +6,12 @@ from openai import OpenAI
 
 # ================= CONFIGURATION =================
 API_KEY = os.getenv("API_KEY")
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 
+
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
+print(f"🔍 DEBUG: Tracking URI is set to: {MLFLOW_TRACKING_URI}")
+if not MLFLOW_TRACKING_URI:
+    print("⚠️ WARNING: MLFLOW_TRACKING_URI is missing! Logging will be local.")
 # Setup Client
 if not API_KEY:
     # Fallback for local testing if env var not set
