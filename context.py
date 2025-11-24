@@ -1,5 +1,4 @@
 import ast
-import tiktoken
 
 def extract_skeleton(code_content):
     """
