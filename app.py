@@ -15,6 +15,10 @@ class TodoCreate(BaseModel):
     title: str
     done: bool = False
 
+class TodoUpdate(BaseModel):
+    title: str = None
+    done: bool = None
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     html = """
@@ -36,6 +40,7 @@ def home():
               const li = document.createElement('li');
               li.id = 'todo-' + t.id;
               li.innerHTML = `<span class="title">${t.title}</span>
+                              <button class="editBtn" data-id="${t.id}">Edit</button>
                               <button class="delBtn" data-id="${t.id}">Delete</button>`;
               list.appendChild(li);
             });
@@ -43,6 +48,20 @@ def home():
               b.onclick = async () => {
                 await fetch('/todos/' + b.dataset.id, {method:'DELETE'});
                 refresh();
+              };
+            });
+            document.querySelectorAll('.editBtn').forEach(b => {
+              b.onclick = async () => {
+                const id = b.dataset.id;
+                const newTitle = prompt('Enter new title:');
+                if (newTitle !== null && newTitle.trim() !== '') {
+                  await fetch('/todos/' + id, {
+                    method:'PUT',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({title: newTitle})
+                  });
+                  refresh();
+                }
               };
             });
           }
@@ -74,6 +93,16 @@ def create_todo(payload: TodoCreate):
 @app.get("/todos")
 def list_todos():
     return list(todos.values())
+
+@app.put("/todos/{todo_id}")
+def update_todo(todo_id: int, payload: TodoUpdate):
+    if todo_id in todos:
+        if payload.title is not None:
+            todos[todo_id]["title"] = payload.title
+        if payload.done is not None:
+            todos[todo_id]["done"] = payload.done
+        return todos[todo_id]
+    return {"status": "not_found"}
 
 @app.delete("/todos/{todo_id}")
 def delete_todo(todo_id: int):
