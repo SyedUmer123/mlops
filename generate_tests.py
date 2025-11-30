@@ -69,7 +69,7 @@ Provide ONLY runnable Python code.
 
 # ================== MAIN ==================
 if __name__ == "__main__":
-    app_code = read_code("app/main.py")
+    app_code = read_code("app.py")
     diff = get_diff()
     test_code = generate_test_code(app_code, diff)
     write_file("tests/generated_test.py", test_code)
