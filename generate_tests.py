@@ -61,6 +61,11 @@ Full app code:
 
 Write a complete pytest file using fastapi.testclient.
 Provide ONLY runnable Python code.
+
+CRITICAL INSTRUCTIONS:
+
+Import Rule: from app import app, todos
+
 """
 
     content = call_llm(prompt)
