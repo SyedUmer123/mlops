@@ -50,4 +50,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: generated-tests
-          path: test_app_generated.py
+          path: generated_test.py
