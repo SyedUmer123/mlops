@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-test_file = "tests/generated_test.py"
+test_file = "generated_test.py"
 
 result = subprocess.run(
     ["pytest", test_file, "-q", "--maxfail=1", "--tb=short"],

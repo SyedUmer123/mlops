@@ -2,12 +2,15 @@ import os
 import re
 from pathlib import Path
 from openai import OpenAI
+from dotenv import load_dotenv
 
 from diff import get_diff
 try:
     from context import extract_skeleton
 except ImportError:
     extract_skeleton = None
+
+load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = "llama-3.3-70b-versatile"
@@ -43,29 +46,42 @@ def generate_test_code(app_code, diff=None):
         prompt = f"""
 You are a Senior QA Automation Engineer.
 
-Skeleton of app:
+I am providing you with:
+1. THE CONTEXT: The skeleton of the app (Imports, Models, Signatures).
+2. THE CHANGE: The specific logic that was just modified (Git Diff).
+
+=== 1. APP SKELETON (Context) ===
+```python
 {skeleton}
-
-Git diff:
+=== 2. GIT DIFF (The Change) ===
 {diff}
-
+TASK:
 Write a complete pytest file to verify the logic changed in the DIFF.
-Provide ONLY runnable Python code.
+You do not need to test unchanged parts of the app, but the test file must be runnable.
+
+CRITICAL INSTRUCTIONS:
+Import Rule: MUST use: from app import app, todos
+State Isolation: Use a fixture to clear todos before tests.
+Logic: Infer the full logic from the context and the diff.
+Output: Provide ONLY the executable python code.
 """
     else:
+        print("⚠️ Strategy: FULL CONTEXT (Fallback)")
         prompt = f"""
-You are a Senior QA Automation Engineer.
-
-Full app code:
-{app_code}
-
-Write a complete pytest file using fastapi.testclient.
-Provide ONLY runnable Python code.
+        You are a Senior QA Automation Engineer.
+        Here is a FastAPI application code (filename: app.py):
+        {app_code}
+Write a complete Python test file using pytest and fastapi.testclient.
 
 CRITICAL INSTRUCTIONS:
 
 Import Rule: from app import app, todos
 
+Clear todos before every test.
+
+Capture dynamic IDs.
+
+Output ONLY python code.
 """
 
     content = call_llm(prompt)
@@ -77,5 +93,5 @@ if __name__ == "__main__":
     app_code = read_code("app.py")
     diff = get_diff()
     test_code = generate_test_code(app_code, diff)
-    write_file("tests/generated_test.py", test_code)
+    write_file("generated_test.py", test_code)
     print("Generated tests saved to tests/generated_test.py")
