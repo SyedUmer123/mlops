@@ -1,9 +1,6 @@
-name: Test Pipeline
+name: Main Branch Test Runner
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -32,22 +29,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Generate tests
-        env:
-          API_KEY: ${{ secrets.API_KEY }} 
-          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_USERNAME }}
-          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_PASSWORD }}
-        run: |
-          python generate_tests.py
-
       - name: Run tests
         run: |
           python run_tests.py
 
-      - name: 📊 Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-tests
-          path: test_app_generated.py
+      
