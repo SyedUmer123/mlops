@@ -1,34 +1,61 @@
-name: Main Branch Test Runner
+name: Pipeline Test Generator
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
+      - pipeline
 
-      
 jobs:
   generate_and_test:
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
-      - name: Get code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0 # Change 1: Fetch all history (needed to see origin/main)
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.12.3' 
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Generate tests
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: python generate_tests.py
+
       - name: Run tests
-        run: |
-          python run_tests.py
+        run: python run_tests.py
+
+      - name: Upload generated tests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-tests
+          path: generated_test.py
+      
+      - name: Get commit message
+        id: msg
+        run: echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+
+      # Change 2: Revert the workflow file to match 'main'
+      # This ensures the workflow file itself is NOT included in the PR
+      - name: Reset workflow file
+        run: git checkout origin/main -- .github/workflows/test_pipeline.yml
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          # Change 3: Use a separate branch for the bot
+          # This prevents "diverged branch" errors on your pipeline branch
+          branch: bot/generated-tests
+          base: main
+          title: "Auto PR: ${{ steps.msg.outputs.message }}"
+          body: "Generated tests for: ${{ steps.msg.outputs.message }}"
