@@ -31,9 +31,9 @@ def test_list_todos():
 def test_update_todo():
     response = client.post("/todos", json={"title": "Test Todo"})
     todo_id = response.json()["id"]
-    response = client.put(f"/todos/{todo_id}", json={"title": "Updated Todo"})
+    response = client.put(f"/todos/{todo_id}", json={"title": "Updated Test Todo"})
     assert response.status_code == 200
-    assert response.json()["title"] == "Updated Todo"
+    assert response.json()["title"] == "Updated Test Todo"
 
 def test_delete_todo():
     response = client.post("/todos", json={"title": "Test Todo"})
@@ -43,7 +43,7 @@ def test_delete_todo():
     assert response.json()["status"] == "ok"
 
 def test_update_non_existent_todo():
-    response = client.put("/todos/1", json={"title": "Updated Todo"})
+    response = client.put("/todos/1", json={"title": "Updated Test Todo"})
     assert response.status_code == 200
     assert response.json()["status"] == "not_found"
 
