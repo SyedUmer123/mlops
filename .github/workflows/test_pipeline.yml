@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Change 1: Fetch all history (needed to see origin/main)
+          fetch-depth: 0 
 
       - uses: actions/setup-python@v5
         with:
@@ -25,13 +25,27 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          pip install boto3  # <--- NEW: Required for S3 uploads
 
       - name: Generate tests
         env:
           API_KEY: ${{ secrets.API_KEY }}
+          # --- NEW: MLflow & AWS Config ---
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} # e.g., us-east-1
+          # --------------------------------
         run: python generate_tests.py
 
       - name: Run tests
+        env:
+          # --- NEW: Needs credentials to upload logs/failures to S3 ---
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          # ------------------------------------------------------------
         run: python run_tests.py
 
       - name: Upload generated tests
@@ -45,16 +59,12 @@ jobs:
         id: msg
         run: echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
 
-      # Change 2: Revert the workflow file to match 'main'
-      # This ensures the workflow file itself is NOT included in the PR
       - name: Reset workflow file
         run: git checkout origin/main -- .github/workflows/test_pipeline.yml
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          # Change 3: Use a separate branch for the bot
-          # This prevents "diverged branch" errors on your pipeline branch
           branch: bot/generated-tests
           base: main
           title: "Auto PR: ${{ steps.msg.outputs.message }}"
