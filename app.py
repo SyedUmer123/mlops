@@ -12,7 +12,7 @@ todos = {}
 next_id = 1
 
 class TodoCreate(BaseModel):
-    title: str=Field(..., min_length=1)
+    title: str=Field(..., min_length=1,max_length=100)
     done: bool = False
 
 class TodoUpdate(BaseModel):
