@@ -1,6 +1,7 @@
 import ast
 import mlflow
 import re
+import sys
 
 TEST_FILE = "generated_test.py"
 
@@ -61,16 +62,17 @@ def validate_test_format(code: str):
     return True, None
 
 
+
 if __name__ == "__main__":
     mlflow.set_experiment("AI Test Generator")
 
+    # do NOT use exit() inside this block
     with mlflow.start_run(nested=True):
 
         # Load test code
         with open(TEST_FILE, "r") as f:
             code = f.read()
 
-        # Run validators
         checks = [
             validate_syntax,
             validate_imports,
@@ -85,13 +87,18 @@ if __name__ == "__main__":
                 mlflow.log_metric("validation_passed", 0)
                 mlflow.log_param("validation_error", error)
 
-                # Save invalid test file
                 with open("invalid_test.py", "w") as bad:
                     bad.write(code)
                 mlflow.log_artifact("invalid_test.py")
 
-                exit(1)
+                FAILED = True
+                break
+        else:
+            print("Validation Passed")
+            mlflow.log_metric("validation_passed", 1)
+            FAILED = False
 
-        print("Validation Passed")
-        mlflow.log_metric("validation_passed", 1)
-        exit(0)
+    # After run closes cleanly:
+    if FAILED:
+        sys.exit(1)
+    sys.exit(0)

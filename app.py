@@ -2,7 +2,7 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uvicorn
 
 app = FastAPI(title="Todo Demo v1")
@@ -12,7 +12,7 @@ todos = {}
 next_id = 1
 
 class TodoCreate(BaseModel):
-    title: str
+    title: str=Field(..., min_length=1)
     done: bool = False
 
 class TodoUpdate(BaseModel):
