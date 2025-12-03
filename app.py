@@ -104,12 +104,5 @@ def update_todo(todo_id: int, payload: TodoUpdate):
         return todos[todo_id]
     return {"status": "not_found"}
 
-@app.delete("/todos/{todo_id}")
-def delete_todo(todo_id: int):
-    if todo_id in todos:
-        todos.pop(todo_id)
-        return {"status": "ok"}
-    return {"status": "not_found"}
-
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
