@@ -77,15 +77,15 @@ jobs:
         with:
           branch: bot/generated-tests-v1
           base: main
-          # add-paths: |
-          #   *.py
-          #   app.py
-          #   context.py
-          #   generate_tests.py
-          #   run_tests.py
-          #   validate_generated_test.py
-          #   prompt/**
-          #   generated_test.py
+          add-paths: |
+            *.py
+            app.py
+            context.py
+            generate_tests.py
+            run_tests.py
+            validate_generated_test.py
+            prompts/**
+            generated_test.py
 
           title: "Auto PR: ${{ steps.msg.outputs.message }}"
           body: "Generated tests for: ${{ steps.msg.outputs.message }}"
