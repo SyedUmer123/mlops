@@ -1,5 +1,6 @@
 import ast
 import re
+import os
 
 def get_changed_functions(app_code, diff):
     """
