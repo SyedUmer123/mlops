@@ -2,3 +2,9 @@ venv/
 __pycache__/
 .env
 mlruns/
+generated_test.py
+test_stdout.txt
+prompt_used.txt
+invalid_test.py
+*.log
+*.patch
