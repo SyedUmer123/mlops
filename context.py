@@ -1,53 +1,60 @@
 import ast
 
-def extract_skeleton(code_content):
+def extract_skeleton(code: str) -> str:
     """
-    Parses Python code and returns a 'Skeleton' (Imports, Globals, Signatures).
-    It removes the actual logic inside functions to save tokens.
+    Parses code and returns a skeleton. 
+    CRITICAL UPDATE: Now preserves Pydantic fields (Annotated Assignments).
     """
-    tree = ast.parse(code_content)
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return "Error parsing code structure."
+
     skeleton_lines = []
-    
-    # 1. Extract Imports (Vital for context)
+
     for node in tree.body:
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            skeleton_lines.append(ast.get_source_segment(code_content, node))
-
-    skeleton_lines.append("\n# --- GLOBALS & MODELS ---\n")
-
-    # 2. Extract Global Variables & Pydantic Models (Vital for data structure)
-    for node in tree.body:
-        # If it's a class (Pydantic Model), keep the WHOLE thing
-        if isinstance(node, ast.ClassDef):
-            skeleton_lines.append(ast.get_source_segment(code_content, node))
-        
-        # If it's a global variable assignment (e.g. todos = {})
-        elif isinstance(node, ast.Assign):
-            skeleton_lines.append(ast.get_source_segment(code_content, node))
-
-    skeleton_lines.append("\n# --- FUNCTION SIGNATURES (Logic Removed) ---\n")
-
-    # 3. Extract Function Definitions (But replace body with '...')
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef):
-            # Get the decorators (e.g. @app.get)
-            decorators = []
-            for dec in node.decorator_list:
-                dec_source = ast.get_source_segment(code_content, dec)
-                decorators.append(f"@{dec_source}")
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            # Handle Functions (Keep signatures)
+            args = [arg.arg for arg in node.args.args]
+            args_str = ", ".join(args)
+            def_type = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
+            skeleton_lines.append(f"{def_type} {node.name}({args_str}):")
             
-            # Reconstruct the signature
-            args = ast.get_source_segment(code_content, node.args)
+            if ast.get_docstring(node):
+                skeleton_lines.append(f'    """{ast.get_docstring(node)}"""')
+            skeleton_lines.append("    ...\n")
+
+        elif isinstance(node, ast.ClassDef):
+            # Handle Classes (Keep Fields/Attributes)
+            skeleton_lines.append(f"class {node.name}:")
+            if ast.get_docstring(node):
+                skeleton_lines.append(f'    """{ast.get_docstring(node)}"""')
             
-            # Construct the skeleton function
-            func_skel = f"{'\n'.join(decorators)}\ndef {node.name}({args}):\n    ..."
-            skeleton_lines.append(func_skel)
+            # --- NEW LOGIC START ---
+            # Extract fields like 'title: str' or 'done: bool = False'
+            has_fields = False
+            for subnode in node.body:
+                if isinstance(subnode, ast.AnnAssign):
+                    try:
+                        target = ast.unparse(subnode.target)
+                        annotation = ast.unparse(subnode.annotation)
+                        line = f"    {target}: {annotation}"
+                        # Check for default values (e.g., = False)
+                        if subnode.value:
+                            line += " = ..." # Hide actual value to save tokens, or keep it
+                        skeleton_lines.append(line)
+                        has_fields = True
+                    except Exception:
+                        pass
+            
+            if not has_fields:
+                skeleton_lines.append("    # (Methods/Fields hidden)")
+            else:
+                 skeleton_lines.append("    # Methods hidden...")
+            # --- NEW LOGIC END ---
+            skeleton_lines.append("")
 
-    return "\n\n".join(skeleton_lines)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            skeleton_lines.append(ast.unparse(node))
 
-# Test it immediately
-if __name__ == "__main__":
-    with open("app.py", "r") as f:
-        code = f.read()
-    print(extract_skeleton(code))
-    
+    return "\n".join(skeleton_lines)

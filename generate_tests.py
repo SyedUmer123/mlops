@@ -127,13 +127,11 @@ The function `{func_name}` has been modified. We need a robust, parameterized te
 {context_instruction}
 
 === REQUIREMENTS ===
-1. Use `@pytest.mark.parametrize` to cover at least 5 distinct scenarios:
-   - Happy path (standard valid inputs)
-   - Edge cases (empty strings, None, zeros, negative numbers, max values)
-   - Error cases (inputs that should raise exceptions, if applicable)
-2. The output must be a SINGLE function named `test_{func_name}`.
-3. Assume `app` and `todos` (or relevant modules) are imported.
-4. Output ONLY valid Python code. No markdown formatting.
+1. Use `@pytest.mark.parametrize` for coverage.
+2. IMPORTANT: When testing validation errors (422), pass a raw dictionary (json={{...}}) to the client, DO NOT instantiate the Pydantic model, or the test will crash early.
+3. Use Pydantic V2 methods: use `.model_dump()` instead of `.dict()`.
+4. Assume `app` and `todos` (or relevant modules) are imported.
+5. Output ONLY valid Python code. No markdown formatting.
 """
 
     content, duration, usage = call_llm(prompt)
