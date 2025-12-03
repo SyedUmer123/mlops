@@ -45,14 +45,14 @@ def write_file(path, content):
 
 def load_prompt_registry():
     """Load the YAML registry."""
-    return yaml.safe_load(read_file("prompts/prompt_registry.yaml"))
+    return yaml.safe_load(read_code("prompts/prompt_registry.yaml"))
 
 def load_prompt_template(prompt_type, version):
     """Return path + template contents."""
     registry = load_prompt_registry()
     fname = registry[prompt_type]["versions"][version]
     path = f"prompts/{fname}"
-    template = read_file(path)
+    template = read_code(path)
     return template, path
 
 # ================= LLM CALL =================
@@ -108,7 +108,7 @@ def generate_test_code(app_code, diff):
 # ================= MAIN =================
 if __name__ == "__main__":
     diff = get_diff()
-    app_code = read_file("app.py")
+    app_code = read_code("app.py")
 
     mlflow.set_experiment("AI Test Generator")
 
