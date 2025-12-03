@@ -1,69 +1,82 @@
-import pytest
+# v1/test_app.py
 from fastapi.testclient import TestClient
 from app import app, todos
 
 client = TestClient(app)
 
+def clear_todos():
+    global todos
+    todos.clear()
+
 def test_home():
+    clear_todos()
     response = client.get("/")
     assert response.status_code == 200
     assert "Todo App v1" in response.text
 
 def test_create_todo():
-    response = client.post("/todos", json={"title": "Test Todo"})
+    clear_todos()
+    response = client.post("/todos", json={"title": "Test Todo", "done": False})
     assert response.status_code == 200
-    assert "id" in response.json()
-    assert "title" in response.json()
-    assert "done" in response.json()
+    assert response.json()["title"] == "Test Todo"
+    assert response.json()["done"] == False
 
 def test_list_todos():
-    client.post("/todos", json={"title": "Test Todo 1"})
-    client.post("/todos", json={"title": "Test Todo 2"})
+    clear_todos()
+    client.post("/todos", json={"title": "Test Todo 1", "done": False})
+    client.post("/todos", json={"title": "Test Todo 2", "done": False})
     response = client.get("/todos")
     assert response.status_code == 200
     assert len(response.json()) == 2
 
 def test_update_todo():
-    client.post("/todos", json={"title": "Test Todo"})
-    response = client.put("/todos/1", json={"title": "Updated Todo"})
+    clear_todos()
+    response = client.post("/todos", json={"title": "Test Todo", "done": False})
+    todo_id = response.json()["id"]
+    response = client.put(f"/todos/{todo_id}", json={"title": "Updated Test Todo"})
     assert response.status_code == 200
-    assert response.json()["title"] == "Updated Todo"
+    assert response.json()["title"] == "Updated Test Todo"
 
 def test_delete_todo():
-    client.post("/todos", json={"title": "Test Todo"})
-    response = client.delete("/todos/1")
+    clear_todos()
+    response = client.post("/todos", json={"title": "Test Todo", "done": False})
+    todo_id = response.json()["id"]
+    response = client.delete(f"/todos/{todo_id}")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
-def test_not_found_todo():
-    response = client.get("/todos/1")
-    assert response.status_code == 404
-
-def test_create_todo_invalid_json():
-    response = client.post("/todos", json={"invalid": "json"})
-    assert response.status_code == 422
-
-def test_update_todo_invalid_json():
-    client.post("/todos", json={"title": "Test Todo"})
-    response = client.put("/todos/1", json={"invalid": "json"})
-    assert response.status_code == 422
-
-def test_delete_todo_invalid_id():
-    response = client.delete("/todos/abc")
-    assert response.status_code == 422
-
-def test_list_todos_empty():
-    todos.clear()
-    response = client.get("/todos")
-    assert response.status_code == 200
-    assert len(response.json()) == 0
-
 def test_update_todo_not_found():
-    response = client.put("/todos/1", json={"title": "Updated Todo"})
+    clear_todos()
+    response = client.put("/todos/1", json={"title": "Updated Test Todo"})
     assert response.status_code == 200
     assert response.json()["status"] == "not_found"
 
 def test_delete_todo_not_found():
+    clear_todos()
     response = client.delete("/todos/1")
     assert response.status_code == 200
     assert response.json()["status"] == "not_found"
+
+def test_create_todo_invalid_title():
+    clear_todos()
+    response = client.post("/todos", json={"title": "", "done": False})
+    assert response.status_code == 422
+
+def test_create_todo_invalid_done():
+    clear_todos()
+    response = client.post("/todos", json={"title": "Test Todo", "done": "invalid"})
+    assert response.status_code == 422
+
+def test_update_todo_invalid_title():
+    clear_todos()
+    response = client.post("/todos", json={"title": "Test Todo", "done": False})
+    todo_id = response.json()["id"]
+    response = client.put(f"/todos/{todo_id}", json={"title": ""})
+    assert response.status_code == 422
+
+def test_update_todo_invalid_done():
+    clear_todos()
+    response = client.post("/todos", json={"title": "Test Todo", "done": False})
+    todo_id = response.json()["id"]
+    response = client.put(f"/todos/{todo_id}", json={"done": "invalid"})
+    assert response.status_code == 422

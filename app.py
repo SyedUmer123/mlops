@@ -16,7 +16,7 @@ class TodoCreate(BaseModel):
     done: bool = False
 
 class TodoUpdate(BaseModel):
-    title: str = None
+    title: str = Field(None, min_length=1, max_length=100)
     done: bool = None
 
 @app.get("/", response_class=HTMLResponse)
