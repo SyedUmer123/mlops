@@ -1,47 +1,32 @@
 import os
 import re
 import time
-import ast
+import yaml
 import mlflow
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
-# === LOCAL MODULES ===
 from diff import get_diff
-
-# Try to import Context skeleton
 try:
     from context import extract_skeleton
 except ImportError:
     extract_skeleton = None
 
-# Try to import Smart Update tools
-try:
-    from smart_update import (
-        get_changed_functions, 
-        update_test_file, 
-        get_existing_test_code
-    )
-except ImportError:
-    print("CRITICAL WARNING: 'smart_update.py' not found. Incremental updates will fail.")
-    get_changed_functions = None
-    update_test_file = None
-    get_existing_test_code = None
-
 load_dotenv()
 
-# === CONFIGURATION ===
 API_KEY = os.getenv("API_KEY")
-MODEL_NAME = "llama-3.3-70b-versatile" # Or your preferred model
-TEST_FILE_PATH = "generated_test.py"
+MODEL_NAME = "llama-3.3-70b-versatile"
 
-# === MLFLOW SETUP ===
+# === UPDATED MLFLOW SETUP ===
+# We now rely on standard env vars: MLFLOW_TRACKING_URI and AWS credentials
 tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
 if tracking_uri:
     mlflow.set_tracking_uri(tracking_uri)
+    print(f"Pointing to MLflow Server: {tracking_uri}")
 else:
     print("Warning: MLFLOW_TRACKING_URI not set. Logs will be saved locally.")
+# ============================
 
 if not API_KEY:
     raise ValueError("API_KEY not set")
@@ -50,8 +35,6 @@ client = OpenAI(api_key=API_KEY, base_url="https://api.groq.com/openai/v1")
 
 # ================= UTILS =================
 def read_code(file_path):
-    if not os.path.exists(file_path):
-        return ""
     with open(file_path, "r", encoding="utf-8") as f:
         return f.read()
 
@@ -60,200 +43,115 @@ def write_file(path, content):
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
 
-def get_function_source(code, func_name):
-    """
-    Extracts the source code of a specific function from app.py using AST.
-    Used to send ONLY the relevant code to the LLM.
-    """
-    try:
-        tree = ast.parse(code)
-        for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name == func_name:
-                    return ast.unparse(node)
-    except Exception as e:
-        print(f"Error extracting source for {func_name}: {e}")
-    return ""
+def load_prompt_registry():
+    """Load the YAML registry."""
+    return yaml.safe_load(read_file("prompts/prompt_registry.yaml"))
+
+def load_prompt_template(prompt_type, version):
+    """Return path + template contents."""
+    registry = load_prompt_registry()
+    fname = registry[prompt_type]["versions"][version]
+    path = f"prompts/{fname}"
+    template = read_file(path)
+    return template, path
 
 # ================= LLM CALL =================
 def call_llm(prompt):
     t0 = time.perf_counter()
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2, # Slightly higher temp for creative edge cases
-        )
-        duration = time.perf_counter() - t0
-        content = response.choices[0].message.content
-        usage = response.usage
-        return content, duration, usage
-    except Exception as e:
-        print(f"LLM Call Failed: {e}")
-        return "", 0, None
 
-# ================= TEST GENERATION LOGIC =================
-
-def generate_single_test_incremental(func_name, func_source, skeleton, test_file_path):
-    """
-    Generates a ROBUST, PARAMETERIZED test for a single function.
-    Reads existing test to preserve legacy edge cases.
-    """
-    
-    # 1. Retrieve Existing Test (Context Merge Strategy)
-    existing_test_code = get_existing_test_code(test_file_path, func_name)
-    
-    context_instruction = ""
-    if existing_test_code:
-        context_instruction = f"""
-=== EXISTING TEST CODE (PRESERVE THESE SCENARIOS) ===
-{existing_test_code}
-
-INSTRUCTION: 
-The function logic has changed. You must UPDATE the test to match the new logic, 
-BUT you must MERGE any valid edge cases from the 'EXISTING TEST CODE' above into your new parameter list.
-"""
-
-    # 2. Construct Prompt
-    prompt = f"""
-You are a Senior QA Automation Engineer.
-The function `{func_name}` has been modified. We need a robust, parameterized test suite.
-
-=== APP STRUCTURE (Context) ===
-{skeleton}
-
-=== NEW FUNCTION CODE (Target) ===
-{func_source}
-{context_instruction}
-
-=== REQUIREMENTS ===
-1. Use `@pytest.mark.parametrize` for coverage.
-2. IMPORTANT: When testing validation errors (422), pass a raw dictionary (json={{...}}) to the client, DO NOT instantiate the Pydantic model, or the test will crash early.
-3. Use Pydantic V2 methods: use `.model_dump()` instead of `.dict()`.
-4. Assume `app` and `todos` (or relevant modules) are imported.
-5. Output ONLY valid Python code. No markdown formatting.
-"""
-
-    content, duration, usage = call_llm(prompt)
-    
-    # Cleanup Markdown
-    clean_code = re.sub(r"```python|```", "", content).strip()
-    return clean_code, prompt, duration, usage
-
-def generate_full_suite_fallback(app_code):
-    """
-    Fallback: Generates the entire test file from scratch (Standard Mode).
-    """
-    prompt = f"""
-You are a Senior QA Automation Engineer.
-Here is the full FastAPI app code:
-
-{app_code}
-
-Write complete pytest tests.
-Requirements:
-1. Use `@pytest.mark.parametrize` for all test functions to maximize coverage.
-2. Import: from app import app, todos
-3. Output ONLY python code.
-"""
-    content, duration, usage = call_llm(prompt)
-    clean_code = re.sub(r"```python|```", "", content).strip()
-    return clean_code, prompt, duration, usage
-
-# ================= MAIN EXECUTION =================
-if __name__ == "__main__":
-    # 1. Setup Environment
-    diff = get_diff()
-    app_code = read_code("app.py")
-    
-    # Determine if we can run in "Smart Incremental Mode"
-    # We need: A diff, the smart_update module, and an existing test file to patch
-    can_update_incrementally = (
-        diff and 
-        get_changed_functions is not None and 
-        os.path.exists(TEST_FILE_PATH)
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1
     )
+
+    duration = time.perf_counter() - t0
+
+    content = response.choices[0].message.content
+    usage = response.usage
+
+    return content, duration, usage
+
+# ================= TEST GENERATION =================
+def generate_test_code(app_code, diff):
+    # 1. Determine prompt type
+    if diff and extract_skeleton:
+        prompt_type = "smart"
+        skeleton = extract_skeleton(app_code)
+    else:
+        prompt_type = "full"
+        skeleton = ""
+
+    # 2. Load registry → get version
+    registry = load_prompt_registry()
+    prompt_version = registry[prompt_type]["current"]
+
+    # 3. Load the template file
+    template, template_path = load_prompt_template(prompt_type, prompt_version)
+
+    # 4. Render prompt (inject values)
+    prompt = template.format(
+        skeleton=skeleton,
+        diff=diff if diff else "",
+        app_code=app_code
+    )
+
+    # 5. Call LLM
+    content, duration, usage = call_llm(prompt)
+
+    # 6. Clean result
+    clean_code = re.sub(r"```python|```", "", content).strip()
+
+    return clean_code, prompt, prompt_type, prompt_version, template_path, duration, usage
+
+
+# ================= MAIN =================
+if __name__ == "__main__":
+    diff = get_diff()
+    app_code = read_file("app.py")
 
     mlflow.set_experiment("AI Test Generator")
 
     with mlflow.start_run():
+        # Generate tests
+        (test_code,
+         rendered_prompt,
+         prompt_type,
+         prompt_version,
+         template_path,
+         duration,
+         usage) = generate_test_code(app_code, diff)
+
+        # ============================
+        # MLFLOW PARAMS
+        # ============================
         mlflow.log_param("model_name", MODEL_NAME)
+        mlflow.log_param("prompt_type", prompt_type)
+        mlflow.log_param("prompt_version", prompt_version)
+        mlflow.log_param("prompt_template_path", template_path)
+        mlflow.log_param("diff_present", bool(diff))
         mlflow.log_param("commit_sha", os.getenv("GITHUB_SHA", "local-run"))
-        mlflow.log_param("mode", "incremental" if can_update_incrementally else "full_suite")
 
-        total_duration = 0
-        total_tokens = 0
+        # ============================
+        # MLFLOW METRICS
+        # ============================
+        mlflow.log_metric("llm_duration", duration)
+        if usage:
+            mlflow.log_metric("llm_prompt_tokens", usage.prompt_tokens)
+            mlflow.log_metric("llm_completion_tokens", usage.completion_tokens)
+            mlflow.log_metric("llm_total_tokens", usage.total_tokens)
 
-        # === PATH A: INCREMENTAL UPDATE ===
-        if can_update_incrementally:
-            print("--- 🚀 Running Smart Incremental Update ---")
-            
-            # Identify which functions actually changed
-            changed_funcs = get_changed_functions(app_code, diff)
-            mlflow.log_param("changed_functions", str(changed_funcs))
-            
-            if not changed_funcs:
-                print("Diff detected, but no specific function logic matched. Skipping.")
-            
-            else:
-                skeleton = extract_skeleton(app_code) if extract_skeleton else ""
-                
-                for func_name in changed_funcs:
-                    print(f"-> Processing: {func_name}")
-                    
-                    # Get the raw code for just this function
-                    func_source = get_function_source(app_code, func_name)
-                    
-                    if not func_source:
-                        print(f"   Skipping {func_name} (Source not found in AST).")
-                        continue
+        # ============================
+        # MLFLOW ARTIFACTS
+        # ============================
+        write_file("generated_test.py", test_code)
+        mlflow.log_artifact("generated_test.py")
 
-                    # Generate Test (Reading old test -> Merging -> Writing new)
-                    test_code, prompt, duration, usage = generate_single_test_incremental(
-                        func_name, func_source, skeleton, TEST_FILE_PATH
-                    )
-                    
-                    if not test_code:
-                        print(f"   Failed to generate code for {func_name}")
-                        continue
+        write_file("prompt_used.txt", rendered_prompt)
+        mlflow.log_artifact("prompt_used.txt")
 
-                    # Surgically update the file
-                    update_test_file(TEST_FILE_PATH, test_code, func_name)
-                    print(f"   Updated test_{func_name} in {TEST_FILE_PATH}")
-                    
-                    # Accumulate Metrics
-                    total_duration += duration
-                    if usage:
-                        total_tokens += usage.total_tokens
-                        
-                    # Log specific prompt for debugging
-                    mlflow.log_text(prompt, f"prompts/{func_name}_prompt.txt")
-
-        # === PATH B: FULL REGENERATION (Fallback) ===
-        else:
-            print("--- Running Full Suite Regeneration (Fresh Start) ---")
-            if not diff:
-                print("(Reason: No Diff detected)")
-            elif not os.path.exists(TEST_FILE_PATH):
-                print("(Reason: No existing test file to patch)")
-            
-            test_code, prompt, duration, usage = generate_full_suite_fallback(app_code)
-            
-            write_file(TEST_FILE_PATH, test_code)
-            print(f"Created new test suite in {TEST_FILE_PATH}")
-            
-            total_duration = duration
-            if usage:
-                total_tokens = usage.total_tokens
-            
-            mlflow.log_text(prompt, "prompts/full_suite_prompt.txt")
-
-        # Final Logs
-        mlflow.log_metric("total_duration", total_duration)
-        mlflow.log_metric("total_tokens", total_tokens)
-        mlflow.log_artifact(TEST_FILE_PATH)
-        
         if diff:
-            mlflow.log_text(diff, "diff.patch")
+            write_file("diff.patch", diff)
+            mlflow.log_artifact("diff.patch")
 
-        print(f"Done. Process finished in {total_duration:.2f}s")
+        print("Generated tests saved to generated_test.py")

@@ -1,0 +1,14 @@
+You are a Senior QA Engineer.
+
+Your task is to generate a complete pytest test file for the FastAPI application.
+
+=== FULL APPLICATION CODE ===
+{app_code}
+
+INSTRUCTIONS:
+- Import rule: from app import app, todos
+- Always clear todos before each test.
+- Use fastapi.testclient.TestClient.
+- Write tests for all API routes present in the application.
+- Handle dynamic ID creation safely.
+- Output ONLY executable Python code, no explanations.

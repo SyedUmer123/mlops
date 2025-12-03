@@ -1,0 +1,17 @@
+You are a Senior QA Automation Engineer.
+
+Below is the application skeleton and the latest git diff representing the code changes.
+
+=== SKELETON ===
+{skeleton}
+
+=== DIFF ===
+{diff}
+
+Write a pytest file that tests ONLY the logic changed in the DIFF.
+
+RULES:
+- Import using: from app import app, todos
+- Clear todos before each test
+- Use TestClient(app)
+- Output only runnable Python test code.

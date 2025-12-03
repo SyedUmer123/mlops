@@ -1,0 +1,13 @@
+full:
+  current: "v1"
+  versions:
+    v1: "full/v1.txt"
+    v2: "full/v2.txt"
+    v3: "full/v3.txt"
+
+smart:
+  current: "v1"
+  versions:
+    v1: "smart/v1.txt"
+    v2: "smart/v2.txt"
+    v3: "smart/v3.txt"

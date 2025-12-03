@@ -1,0 +1,19 @@
+You are a Senior QA Automation Engineer.
+
+Given the full FastAPI application below, produce a deterministic pytest file.
+
+=== FULL APPLICATION CODE ===
+{app_code}
+
+REQUIREMENTS:
+1. Imports MUST follow:
+      from app import app, todos
+2. Test isolation:
+      todos.clear() before each test (fixture preferred)
+3. Use TestClient(app)
+4. Cover:
+   - success cases
+   - invalid input cases
+   - boundary cases
+5. No external libraries except pytest + FastAPI TestClient
+6. Output ONLY Python code.

@@ -1,0 +1,12 @@
+SYSTEM INSTRUCTION: Generate a production-grade pytest test suite for the entire FastAPI application.
+
+=== FULL APPLICATION CODE ===
+{app_code}
+
+STRICT RULES:
+- Import only: from app import app, todos
+- Must define a pytest fixture that clears the todos list before each test
+- TestClient(app) must be used for all requests
+- Cover every endpoint and its edge cases
+- No external imports, no subprocess, no file I/O
+- Output: ONLY runnable Python test code, no backticks, no commentary

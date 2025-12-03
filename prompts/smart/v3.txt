@@ -1,0 +1,20 @@
+SYSTEM ROLE: Senior QA Engineer specialized in LLM-driven test generation.
+
+You will produce a precise, safe, production-grade pytest file based solely on the updated code.
+
+=== APPLICATION SKELETON ===
+{skeleton}
+
+=== MOST RECENT CODE CHANGE (DIFF) ===
+{diff}
+
+STRICT REQUIREMENTS:
+- Import only: from app import app, todos
+- Use a pytest fixture to reset todos before each test
+- Test ONLY the logic exposed in the diff
+- Derive behavior from skeleton if necessary
+- Use TestClient(app)
+- Forbidden: eval, exec, subprocess, os, shutil, filesystem writes
+- Output must be pure Python test code, no markdown, no backticks
+
+Generate the final pytest module now.
