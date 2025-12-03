@@ -1,0 +1,62 @@
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose-v2
+
+sudo usermod -aG docker $USER
+
+
+mkdir mlflow-server
+cd mlflow-server
+
+nano Dockerfile
+
+FROM ghcr.io/mlflow/mlflow:v2.14.1
+
+RUN pip install boto3 psycopg2-binary
+
+
+nano docker-compose.yml
+
+version: '3.7'
+
+services:
+  # 1. The Database (Stores metrics like "Accuracy: 0.95")
+  db:
+    image: postgres:13
+    container_name: mlflow_db
+    environment:
+      - POSTGRES_USER=mlflow_user
+      - POSTGRES_PASSWORD=mlflow_password
+      - POSTGRES_DB=mlflow_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow_user -d mlflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. The MLflow Server (The UI and API)
+  mlflow:
+    build: .
+    container_name: mlflow_server
+    ports:
+      - "5000:5000"
+    environment:
+      # We don't need AWS keys because we attached the IAM Role to the EC2!
+      - AWS_DEFAULT_REGION=us-east-1
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://mlflow_user:mlflow_password@db:5432/mlflow_db
+      --default-artifact-root s3://mlflow-artifacts-umer/
+      --host 0.0.0.0
+      --port 5000
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+
+
+
+docker compose up -d --build

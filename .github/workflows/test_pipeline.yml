@@ -37,7 +37,17 @@ jobs:
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} # e.g., us-east-1
           # --------------------------------
         run: python generate_tests.py
+      
 
+      - name: Validate LLM Generated Tests
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        run: python validate_generated_test.py
+        
+        
       - name: Run tests
         env:
           # --- NEW: Needs credentials to upload logs/failures to S3 ---
