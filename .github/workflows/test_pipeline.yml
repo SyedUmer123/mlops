@@ -75,7 +75,7 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          branch: bot/generated-tests
+          branch: bot/generated-tests-v1
           base: main
           add-paths: |
             *.py
