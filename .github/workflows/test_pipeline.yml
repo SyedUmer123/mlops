@@ -25,20 +25,33 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install boto3  # <--- NEW: Required for S3 uploads
+          pip install boto3
+          pip install requests  # For Pushgateway
 
+      # ========================================
+      # WORKFLOW START - Push to Prometheus
+      # ========================================
+      - name: Push workflow start metrics
+        env:
+          PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}
+        run: python push_metrics.py start
+
+      # ========================================
+      # GENERATE TESTS
+      # ========================================
       - name: Generate tests
+        id: generate
         env:
           API_KEY: ${{ secrets.API_KEY }}
-          # --- NEW: MLflow & AWS Config ---
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} # e.g., us-east-1
-          # --------------------------------
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: python generate_tests.py
-      
 
+      # ========================================
+      # VALIDATE TESTS
+      # ========================================
       - name: Validate LLM Generated Tests
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
@@ -46,18 +59,48 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: python validate_generated_test.py
-        
-        
+
+      # ========================================
+      # RUN TESTS
+      # ========================================
       - name: Run tests
+        id: run_tests
         env:
-          # --- NEW: Needs credentials to upload logs/failures to S3 ---
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-          # ------------------------------------------------------------
         run: python run_tests.py
+        continue-on-error: true
 
+      # ========================================
+      # PUSH METRICS TO PROMETHEUS
+      # ========================================
+      - name: Push workflow metrics
+        if: always()
+        env:
+          PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}
+        run: |
+          # Load metrics from generate_tests.py output
+          python push_metrics.py custom
+
+      # ========================================
+      # MARK WORKFLOW END
+      # ========================================
+      - name: Push workflow completion
+        if: always()
+        env:
+          PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}
+        run: |
+          if [ "${{ steps.run_tests.outcome }}" == "success" ]; then
+            python push_metrics.py end success
+          else
+            python push_metrics.py end failure
+          fi
+
+      # ========================================
+      # UPLOAD ARTIFACTS
+      # ========================================
       - name: Upload generated tests
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,6 +115,9 @@ jobs:
       - name: Reset workflow file
         run: git checkout origin/main -- .github/workflows/test_pipeline.yml
 
+      # ========================================
+      # CREATE PR
+      # ========================================
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:

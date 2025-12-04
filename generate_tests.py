@@ -18,15 +18,13 @@ load_dotenv()
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = "llama-3.3-70b-versatile"
 
-# === UPDATED MLFLOW SETUP ===
-# We now rely on standard env vars: MLFLOW_TRACKING_URI and AWS credentials
+# === MLFLOW SETUP ===
 tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
 if tracking_uri:
     mlflow.set_tracking_uri(tracking_uri)
     print(f"Pointing to MLflow Server: {tracking_uri}")
 else:
     print("Warning: MLFLOW_TRACKING_URI not set. Logs will be saved locally.")
-# ============================
 
 if not API_KEY:
     raise ValueError("API_KEY not set")
@@ -72,6 +70,27 @@ def call_llm(prompt):
 
     return content, duration, usage
 
+# ================= COST CALCULATION =================
+def calculate_cost(usage, model="groq-llama3"):
+    """
+    Calculate LLM cost based on token usage
+    Groq pricing (example, update with actual rates):
+    - Input: ~$0.27 per 1M tokens
+    - Output: ~$0.27 per 1M tokens
+    """
+    if not usage:
+        return 0.0
+    
+    input_cost_per_token = 0.27 / 1_000_000
+    output_cost_per_token = 0.27 / 1_000_000
+    
+    total_cost = (
+        usage.prompt_tokens * input_cost_per_token +
+        usage.completion_tokens * output_cost_per_token
+    )
+    
+    return total_cost
+
 # ================= TEST GENERATION =================
 def generate_test_code(app_code, diff):
     # 1. Determine prompt type
@@ -107,6 +126,8 @@ def generate_test_code(app_code, diff):
 
 # ================= MAIN =================
 if __name__ == "__main__":
+    workflow_start = time.perf_counter()
+    
     diff = get_diff()
     app_code = read_code("app.py")
 
@@ -122,6 +143,12 @@ if __name__ == "__main__":
          duration,
          usage) = generate_test_code(app_code, diff)
 
+        # Calculate cost
+        llm_cost = calculate_cost(usage)
+        
+        # Count generated tests
+        tests_generated = len(re.findall(r"def test_", test_code))
+
         # ============================
         # MLFLOW PARAMS
         # ============================
@@ -136,6 +163,9 @@ if __name__ == "__main__":
         # MLFLOW METRICS
         # ============================
         mlflow.log_metric("llm_duration", duration)
+        mlflow.log_metric("llm_cost_usd", llm_cost)
+        mlflow.log_metric("tests_generated", tests_generated)
+        
         if usage:
             mlflow.log_metric("llm_prompt_tokens", usage.prompt_tokens)
             mlflow.log_metric("llm_completion_tokens", usage.completion_tokens)
@@ -154,4 +184,22 @@ if __name__ == "__main__":
             write_file("diff.patch", diff)
             mlflow.log_artifact("diff.patch")
 
-        print("Generated tests saved to generated_test.py")
+        # ============================
+        # EXPORT METRICS FOR PROMETHEUS
+        # ============================
+        metrics_summary = {
+            "tests_generated": tests_generated,
+            "llm_tokens_used": usage.total_tokens if usage else 0,
+            "llm_cost_usd": llm_cost,
+            "llm_latency_seconds": duration,
+            "prompt_tokens": usage.prompt_tokens if usage else 0,
+            "completion_tokens": usage.completion_tokens if usage else 0,
+        }
+        
+        write_file("metrics_summary.json", 
+                   __import__('json').dumps(metrics_summary, indent=2))
+
+        print("✅ Generated tests saved to generated_test.py")
+        print(f"📊 Generated {tests_generated} tests")
+        print(f"💰 Cost: ${llm_cost:.4f}")
+        print(f"⏱️  Duration: {duration:.2f}s")
