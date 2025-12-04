@@ -50,6 +50,20 @@ jobs:
         run: python generate_tests.py
 
       # ========================================
+      # VERIFY METRICS FILE WAS CREATED
+      # ========================================
+      - name: Verify metrics file
+        run: |
+          echo "📊 Checking if metrics_summary.json was created..."
+          if [ -f "metrics_summary.json" ]; then
+            echo "✅ metrics_summary.json found"
+            cat metrics_summary.json
+          else
+            echo "❌ metrics_summary.json NOT found!"
+            exit 1
+          fi
+
+      # ========================================
       # VALIDATE TESTS
       # ========================================
       - name: Validate LLM Generated Tests
@@ -81,8 +95,16 @@ jobs:
         env:
           PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}
         run: |
-          # Load metrics from generate_tests.py output
+          echo "📤 Pushing metrics to Pushgateway..."
+          
+          # Verify files exist
+          echo "Checking for required files:"
+          ls -la metrics_summary.json test_stdout.txt 2>/dev/null || echo "Some files missing"
+          
+          # Push metrics
           python push_metrics.py custom
+          
+          echo "✅ Metrics push completed"
 
       # ========================================
       # MARK WORKFLOW END
@@ -99,14 +121,18 @@ jobs:
           fi
 
       # ========================================
-      # UPLOAD ARTIFACTS
+      # UPLOAD ARTIFACTS FOR DEBUGGING
       # ========================================
-      - name: Upload generated tests
+      - name: Upload metrics and test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: generated-tests
-          path: generated_test.py
+          name: workflow-outputs
+          path: |
+            generated_test.py
+            metrics_summary.json
+            test_stdout.txt
+            test_stderr.txt
       
       - name: Get commit message
         id: msg
