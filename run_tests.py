@@ -85,4 +85,7 @@ with mlflow.start_run(nested=True):
     else:
         print("Tests failed")
 
-    sys.exit(result.returncode)
+    if result.returncode == 0:
+        mlflow.end_run(status="FINISHED")
+    else:
+        mlflow.end_run(status="FAILED")

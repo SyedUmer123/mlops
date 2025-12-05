@@ -85,7 +85,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: python run_tests.py
-        continue-on-error: true
+        
 
       # ========================================
       # PUSH METRICS TO PROMETHEUS
