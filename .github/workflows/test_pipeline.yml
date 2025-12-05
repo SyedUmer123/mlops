@@ -138,66 +138,8 @@ jobs:
         id: msg
         run: echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
 
-      # ========================================
-      # CLEANUP: Remove temporary files
-      # ========================================
-      - name: Clean up temporary files
-        run: |
-          echo "🧹 Cleaning up temporary files..."
-          
-          # Remove test execution artifacts
-          rm -f test_stdout.txt
-          rm -f test_stderr.txt
-          rm -f metrics_summary.json
-          rm -f failed_tests.py
-          rm -f prompt_used.txt
-          rm -f diff.patch
-          
-          # List what remains
-          echo "Files after cleanup:"
-          git status --short
-          
-          echo "✅ Cleanup complete"
-
-      # ========================================
-      # RESET WORKFLOW FILE
-      # ========================================
       - name: Reset workflow file
-        run: |
-          # This prevents the workflow file changes from being included in the PR
-          git checkout origin/main -- .github/workflows/test_pipeline.yml
-          echo "✅ Workflow file reset to main branch version"
-
-      # ========================================
-      # DEBUG: Show what will be committed
-      # ========================================
-      - name: Debug - Show PR contents
-        run: |
-          echo "================================"
-          echo "🔍 Files that will be in PR:"
-          echo "================================"
-          
-          # Show git status
-          git status --short
-          
-          # Show files different from main
-          echo ""
-          echo "Files different from main branch:"
-          git diff --name-only origin/main...HEAD | while read file; do
-            if [ -f "$file" ]; then
-              echo "  ✅ $file"
-            fi
-          done
-          
-          # Check specific files
-          echo ""
-          echo "Specific checks:"
-          [ -f "generated_test.py" ] && echo "  ✅ generated_test.py exists" || echo "  ❌ generated_test.py missing"
-          [ -f "app.py" ] && echo "  ✅ app.py exists" || echo "  ❌ app.py missing"
-          [ -f "test_stdout.txt" ] && echo "  ⚠️  test_stdout.txt still exists (should be removed)" || echo "  ✅ test_stdout.txt removed"
-          [ -f "metrics_summary.json" ] && echo "  ⚠️  metrics_summary.json still exists (should be removed)" || echo "  ✅ metrics_summary.json removed"
-          
-          echo "================================"
+        run: git checkout origin/main -- .github/workflows/test_pipeline.yml
 
       # ========================================
       # CREATE PR
@@ -205,24 +147,17 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          branch: bot/generate-tests
+          branch: bot/generated-tests-v1
           base: main
-          delete-branch: true
-          
-          commit-message: |
-            Generated tests + code changes
-            
-            Original commit: ${{ steps.msg.outputs.message }}
-            Workflow run: ${{ github.run_number }}
-          
-          title: "Tests: ${{ steps.msg.outputs.message }}"
-          
-          body: |
-            ## Automated Test Generation
-            
-            **Trigger:** ${{ steps.msg.outputs.message }}
-            **Workflow Run:** [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            **Source Branch:** `pipeline`
-            **Commit:** `${{ github.sha }}`
-            
-         
+          add-paths: |
+            *.py
+            app.py
+            context.py
+            generate_tests.py
+            run_tests.py
+            validate_generated_test.py
+            prompts/**
+            generated_test.py
+
+          title: "Auto PR: ${{ steps.msg.outputs.message }}"
+          body: "Generated tests for: ${{ steps.msg.outputs.message }}"
