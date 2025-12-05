@@ -139,7 +139,28 @@ jobs:
         run: echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
 
       # ========================================
-      # IMPORTANT: Keep workflow file from main
+      # CLEANUP: Remove temporary files
+      # ========================================
+      - name: Clean up temporary files
+        run: |
+          echo "🧹 Cleaning up temporary files..."
+          
+          # Remove test execution artifacts
+          rm -f test_stdout.txt
+          rm -f test_stderr.txt
+          rm -f metrics_summary.json
+          rm -f failed_tests.py
+          rm -f prompt_used.txt
+          rm -f diff.patch
+          
+          # List what remains
+          echo "Files after cleanup:"
+          git status --short
+          
+          echo "✅ Cleanup complete"
+
+      # ========================================
+      # RESET WORKFLOW FILE
       # ========================================
       - name: Reset workflow file
         run: |
@@ -148,23 +169,45 @@ jobs:
           echo "✅ Workflow file reset to main branch version"
 
       # ========================================
-      # CREATE PR - The create-pull-request action
-      # will automatically detect ALL uncommitted changes
+      # DEBUG: Show what will be committed
+      # ========================================
+      - name: Debug - Show PR contents
+        run: |
+          echo "================================"
+          echo "🔍 Files that will be in PR:"
+          echo "================================"
+          
+          # Show git status
+          git status --short
+          
+          # Show files different from main
+          echo ""
+          echo "Files different from main branch:"
+          git diff --name-only origin/main...HEAD | while read file; do
+            if [ -f "$file" ]; then
+              echo "  ✅ $file"
+            fi
+          done
+          
+          # Check specific files
+          echo ""
+          echo "Specific checks:"
+          [ -f "generated_test.py" ] && echo "  ✅ generated_test.py exists" || echo "  ❌ generated_test.py missing"
+          [ -f "app.py" ] && echo "  ✅ app.py exists" || echo "  ❌ app.py missing"
+          [ -f "test_stdout.txt" ] && echo "  ⚠️  test_stdout.txt still exists (should be removed)" || echo "  ✅ test_stdout.txt removed"
+          [ -f "metrics_summary.json" ] && echo "  ⚠️  metrics_summary.json still exists (should be removed)" || echo "  ✅ metrics_summary.json removed"
+          
+          echo "================================"
+
+      # ========================================
+      # CREATE PR
       # ========================================
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          # Use dynamic branch name to avoid conflicts
           branch: bot/tests-${{ github.run_number }}
           base: main
           delete-branch: true
-          
-          # Don't specify add-paths - let it commit ALL changes
-          # This will include:
-          # - generated_test.py (newly created)
-          # - app.py (if modified in pipeline branch)
-          # - Any other .py files changed
-          # - prompts/ directory changes
           
           commit-message: |
             🤖 Generated tests + code changes
@@ -182,4 +225,4 @@ jobs:
             **Source Branch:** `pipeline`
             **Commit:** `${{ github.sha }}`
             
-            
+         

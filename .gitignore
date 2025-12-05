@@ -1,10 +1,41 @@
-venv/
-__pycache__/
-.env
-mlruns/
-generated_test.py
+# Add these lines to your .gitignore file
+
+# Test execution artifacts (should not be committed)
 test_stdout.txt
+test_stderr.txt
+metrics_summary.json
+failed_tests.py
+
+# MLflow artifacts (uploaded to S3, not needed in repo)
 prompt_used.txt
-invalid_test.py
-*.log
-*.patch
+diff.patch
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# MLflow local tracking
+mlruns/
+mlartifacts/
+
+# Environment variables
+.env
+.env.local
