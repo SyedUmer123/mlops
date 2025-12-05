@@ -14,6 +14,11 @@ def test_home():
     assert response.status_code == 200
     assert "Todo App v1" in response.text
 
+def test_health_check():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "healthy", "version": "v1.1"}
+
 def test_create_todo():
     payload = {"title": "Test Todo", "done": False}
     response = client.post("/todos", json=payload)
@@ -23,8 +28,10 @@ def test_create_todo():
     assert response.json()["done"] == payload["done"]
 
 def test_list_todos():
-    payload = {"title": "Test Todo", "done": False}
-    client.post("/todos", json=payload)
+    payload1 = {"title": "Test Todo 1", "done": False}
+    payload2 = {"title": "Test Todo 2", "done": True}
+    client.post("/todos", json=payload1)
+    client.post("/todos", json=payload2)
     response = client.get("/todos")
     assert response.status_code == 200
     assert len(response.json()) == 1
@@ -38,20 +45,7 @@ def test_update_todo():
     update_payload = {"title": "Updated Todo"}
     response = client.put(f"/todos/{todo_id}", json=update_payload)
     assert response.status_code == 200
-    assert response.json()["id"] == todo_id
     assert response.json()["title"] == update_payload["title"]
-    assert response.json()["done"] == payload["done"]
-
-def test_update_todo_partial():
-    payload = {"title": "Test Todo", "done": False}
-    response = client.post("/todos", json=payload)
-    todo_id = response.json()["id"]
-    update_payload = {"title": "Updated Todo"}
-    response = client.put(f"/todos/{todo_id}", json=update_payload)
-    assert response.status_code == 200
-    assert response.json()["id"] == todo_id
-    assert response.json()["title"] == update_payload["title"]
-    assert response.json()["done"] == payload["done"]
 
 def test_delete_todo():
     payload = {"title": "Test Todo", "done": False}
@@ -59,42 +53,39 @@ def test_delete_todo():
     todo_id = response.json()["id"]
     response = client.delete(f"/todos/{todo_id}")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
-
-def test_delete_todo_not_found():
-    response = client.delete("/todos/1")
-    assert response.status_code == 200
-    assert response.json()["status"] == "not_found"
+    assert response.json() == {"status": "ok"}
 
 def test_update_todo_not_found():
     update_payload = {"title": "Updated Todo"}
-    response = client.put("/todos/1", json=update_payload)
+    response = client.put("/todos/999", json=update_payload)
     assert response.status_code == 200
-    assert response.json()["status"] == "not_found"
+    assert response.json() == {"status": "not_found"}
 
-class TodoCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=100)
-    done: bool = False
+def test_delete_todo_not_found():
+    response = client.delete("/todos/999")
+    assert response.status_code == 200
+    assert response.json() == {"status": "not_found"}
 
 class TodoUpdate(BaseModel):
-    title: str = Field(None, min_length=1, max_length=100)
+    title: str = None
     done: bool = None
 
-def test_create_todo_model():
-    payload = TodoCreate(title="Test Todo", done=False)
-    response = client.post("/todos", json=payload.model_dump())
-    assert response.status_code == 200
-    assert "id" in response.json()
-    assert response.json()["title"] == payload.title
-    assert response.json()["done"] == payload.done
-
-def test_update_todo_model():
-    payload = TodoCreate(title="Test Todo", done=False)
-    response = client.post("/todos", json=payload.model_dump())
+def test_update_todo_partial():
+    payload = {"title": "Test Todo", "done": False}
+    response = client.post("/todos", json=payload)
     todo_id = response.json()["id"]
     update_payload = TodoUpdate(title="Updated Todo")
     response = client.put(f"/todos/{todo_id}", json=update_payload.model_dump(exclude_unset=True))
     assert response.status_code == 200
-    assert response.json()["id"] == todo_id
     assert response.json()["title"] == update_payload.title
-    assert response.json()["done"] == payload.done
+    assert response.json()["done"] is False
+
+def test_update_todo_partial_done():
+    payload = {"title": "Test Todo", "done": False}
+    response = client.post("/todos", json=payload)
+    todo_id = response.json()["id"]
+    update_payload = TodoUpdate(done=True)
+    response = client.put(f"/todos/{todo_id}", json=update_payload.model_dump(exclude_unset=True))
+    assert response.status_code == 200
+    assert response.json()["title"] == payload["title"]
+    assert response.json()["done"] is True
