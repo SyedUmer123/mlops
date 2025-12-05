@@ -82,6 +82,12 @@ def home():
     """
     return HTMLResponse(content=html)
 
+
+@app.get("/health")
+def health_check():
+    """Simple health check for AWS/k8s probes"""
+    return {"status": "healthy", "version": "v1.1"}
+
 @app.post("/todos")
 def create_todo(payload: TodoCreate):
     global next_id
