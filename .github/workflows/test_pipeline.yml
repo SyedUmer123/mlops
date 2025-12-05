@@ -138,26 +138,48 @@ jobs:
         id: msg
         run: echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
 
+      # ========================================
+      # IMPORTANT: Keep workflow file from main
+      # ========================================
       - name: Reset workflow file
-        run: git checkout origin/main -- .github/workflows/test_pipeline.yml
+        run: |
+          # This prevents the workflow file changes from being included in the PR
+          git checkout origin/main -- .github/workflows/test_pipeline.yml
+          echo "✅ Workflow file reset to main branch version"
 
       # ========================================
-      # CREATE PR
+      # CREATE PR - The create-pull-request action
+      # will automatically detect ALL uncommitted changes
       # ========================================
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          branch: bot/generated-tests-v1
+          # Use dynamic branch name to avoid conflicts
+          branch: bot/tests-${{ github.run_number }}
           base: main
-          add-paths: |
-            *.py
-            app.py
-            context.py
-            generate_tests.py
-            run_tests.py
-            validate_generated_test.py
-            prompts/**
-            generated_test.py
-
-          title: "Auto PR: ${{ steps.msg.outputs.message }}"
-          body: "Generated tests for: ${{ steps.msg.outputs.message }}"
+          delete-branch: true
+          
+          # Don't specify add-paths - let it commit ALL changes
+          # This will include:
+          # - generated_test.py (newly created)
+          # - app.py (if modified in pipeline branch)
+          # - Any other .py files changed
+          # - prompts/ directory changes
+          
+          commit-message: |
+            🤖 Generated tests + code changes
+            
+            Original commit: ${{ steps.msg.outputs.message }}
+            Workflow run: ${{ github.run_number }}
+          
+          title: "🤖 Tests: ${{ steps.msg.outputs.message }}"
+          
+          body: |
+            ## 🤖 Automated Test Generation
+            
+            **Trigger:** ${{ steps.msg.outputs.message }}
+            **Workflow Run:** [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            **Source Branch:** `pipeline`
+            **Commit:** `${{ github.sha }}`
+            
+            
