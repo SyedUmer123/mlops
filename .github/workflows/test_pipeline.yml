@@ -205,24 +205,12 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          branch: bot/tests-${{ github.run_number }}
+          commit-message: "Update generated tests"
+          title: "Auto: Updated tests"
+          body: "Generated tests for: ${{ steps.msg.outputs.message }}"
+          branch: pipeline   # important: PR comes from pipeline!
           base: main
-          delete-branch: true
           
-          commit-message: |
-            🤖 Generated tests + code changes
-            
-            Original commit: ${{ steps.msg.outputs.message }}
-            Workflow run: ${{ github.run_number }}
-          
-          title: "🤖 Tests: ${{ steps.msg.outputs.message }}"
-          
-          body: |
-            ## 🤖 Automated Test Generation
-            
-            **Trigger:** ${{ steps.msg.outputs.message }}
-            **Workflow Run:** [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            **Source Branch:** `pipeline`
-            **Commit:** `${{ github.sha }}`
+
             
          
