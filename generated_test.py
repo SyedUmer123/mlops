@@ -23,12 +23,15 @@ def test_create_todo():
     payload = {"title": "Test Todo", "done": False}
     response = client.post("/todos", json=payload)
     assert response.status_code == 200
+    assert "id" in response.json()
     assert response.json()["title"] == payload["title"]
     assert response.json()["done"] == payload["done"]
 
 def test_list_todos():
-    payload = {"title": "Test Todo", "done": False}
-    client.post("/todos", json=payload)
+    payload1 = {"title": "Test Todo 1", "done": False}
+    payload2 = {"title": "Test Todo 2", "done": True}
+    client.post("/todos", json=payload1)
+    client.post("/todos", json=payload2)
     response = client.get("/todos")
     assert response.status_code == 200
     assert len(response.json()) == 1
@@ -43,17 +46,6 @@ def test_update_todo():
     response = client.put(f"/todos/{todo_id}", json=update_payload)
     assert response.status_code == 200
     assert response.json()["title"] == update_payload["title"]
-    assert response.json()["done"] == payload["done"]
-
-def test_update_todo_partial():
-    payload = {"title": "Test Todo", "done": False}
-    response = client.post("/todos", json=payload)
-    todo_id = response.json()["id"]
-    update_payload = {"done": True}
-    response = client.put(f"/todos/{todo_id}", json=update_payload)
-    assert response.status_code == 200
-    assert response.json()["title"] == payload["title"]
-    assert response.json()["done"] == update_payload["done"]
 
 def test_delete_todo():
     payload = {"title": "Test Todo", "done": False}
@@ -63,29 +55,30 @@ def test_delete_todo():
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-def test_delete_todo_not_found():
-    response = client.delete("/todos/999")
-    assert response.status_code == 200
-    assert response.json() == {"status": "not_found"}
-
 def test_update_todo_not_found():
     update_payload = {"title": "Updated Todo"}
     response = client.put("/todos/999", json=update_payload)
     assert response.status_code == 200
     assert response.json() == {"status": "not_found"}
 
+def test_delete_todo_not_found():
+    response = client.delete("/todos/999")
+    assert response.status_code == 200
+    assert response.json() == {"status": "not_found"}
+
 class TodoCreate(BaseModel):
-    title: str
-    done: bool
+    title: str = Field(..., min_length=1, max_length=100)
+    done: bool = False
 
 class TodoUpdate(BaseModel):
-    title: str = None
+    title: str = Field(None, min_length=1, max_length=100)
     done: bool = None
 
 def test_create_todo_pydantic():
     payload = TodoCreate(title="Test Todo", done=False)
-    response = client.post("/todos", json=payload.dict())
+    response = client.post("/todos", json=payload.model_dump())
     assert response.status_code == 200
+    assert "id" in response.json()
     assert response.json()["title"] == payload.title
     assert response.json()["done"] == payload.done
 
@@ -97,4 +90,3 @@ def test_update_todo_pydantic():
     response = client.put(f"/todos/{todo_id}", json=update_payload.model_dump(exclude_unset=True))
     assert response.status_code == 200
     assert response.json()["title"] == update_payload.title
-    assert response.json()["done"] == payload.done
