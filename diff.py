@@ -17,4 +17,6 @@ def get_diff():
     return diff_text.strip()
 
 
+
+
 print("Diffs: \n", get_diff())
